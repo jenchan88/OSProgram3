@@ -23,12 +23,11 @@ class TLB:
             self.entries.pop(0)  # Remove oldest entry
         self.entries.append({'page': page_number, 'frame': frame_number})
 
-# The TLB class implements the Translation Lookaside Buffer with 16 entries and FIFO replacement.
-
 class PageTable:
     def __init__(self):
-        # Initialize page table with 256 entries, all initially invalid
-        self.entries = [{'frame': None, 'valid': False} for _ in range(PAGE_TABLE_SIZE)]
+        self.entries = []  
+        for i in range(PAGE_TABLE_SIZE):  
+            self.entries.append({'frame': None, 'valid': False})  
 
     def lookup(self, page_number):
         # Check if the page is valid and return its frame number
@@ -39,8 +38,6 @@ class PageTable:
     def update(self, page_number, frame_number):
         # Update the page table entry
         self.entries[page_number] = {'frame': frame_number, 'valid': True}
-
-# The PageTable class manages the page table with 256 entries, each with a validity bit.
 
 class PhysicalMemory:
     def __init__(self, num_frames):
@@ -58,15 +55,11 @@ class PhysicalMemory:
         self.frame_queue.append(frame_number)
         return frame_number
 
-# The PhysicalMemory class manages the physical memory frames and implements FIFO page replacement.
-
 def read_backing_store(filename, page_number):
     # Read a page from the backing store file
     with open(filename, 'rb') as f:
         f.seek(page_number * PAGE_SIZE)
         return f.read(PAGE_SIZE)
-
-# This function reads a specific page from the backing store file.
 
 def simulate(addresses_file, num_frames):
     tlb = TLB()
@@ -77,6 +70,7 @@ def simulate(addresses_file, num_frames):
     tlb_hits = 0
     total_references = 0
 
+    # TODO: Add error handling for file opening
     with open(addresses_file, 'r') as f:
         for line in f:
             logical_address = int(line.strip())
@@ -100,16 +94,26 @@ def simulate(addresses_file, num_frames):
                 tlb.update(page_number, frame_number)
 
             physical_address = (frame_number << 8) | offset
-            byte_value = physical_memory.frames[frame_number][offset]
-            frame_content = ''.join(f'{b:02x}' for b in physical_memory.frames[frame_number])
+            # byte_value = physical_memory.frames[frame_number][offset]
+            unsigned_byte = physical_memory.frames[frame_number][offset]
+            byte_value = unsigned_byte if unsigned_byte < 128 else unsigned_byte - 256
 
-            print(f"{logical_address},{byte_value},{frame_number},{frame_content}")
+            # frame_content = ''.join(f'{b:02x}' for b in physical_memory.frames[frame_number])
+            frame_content = physical_memory.frames[frame_number].hex()
+
+
+            print(f"{logical_address},{byte_value},{frame_number},\n{frame_content}")
             total_references += 1
 
-    print(f"Number of page faults: {page_faults}")
-    print(f"Page fault rate: {page_faults/total_references:.2%}")
-    print(f"TLB hit count: {tlb_hits}")
-    print(f"TLB hit rate: {tlb_hits/total_references:.2%}")
+    # Print statistics
+    tlb_misses = total_references - tlb_hits
+    
+    print(f"\nNumber of Translated Addresses = {total_references}")
+    print(f"Page Faults = {page_faults}")
+    print(f"Page Fault Rate = {page_faults/total_references:.3f}")
+    print(f"TLB Hits = {tlb_hits}")
+    print(f"TLB Misses = {tlb_misses}")
+    print(f"TLB Hit Rate = {tlb_hits/total_references:.3f}")
 
 
 if __name__ == "__main__":
@@ -121,4 +125,3 @@ if __name__ == "__main__":
     num_frames = int(sys.argv[2]) if len(sys.argv) > 2 else 256
 
     simulate(addresses_file, num_frames)
-
