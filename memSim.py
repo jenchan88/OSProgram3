@@ -43,6 +43,7 @@ class PhysicalMemory:
             self.frames.append(bytearray(FRAME_SIZE))
         self.frame_queue = []
         self.page_to_frame = {}
+        self.current_pages = set()
 
     def load_page(self, page_data, page_number):
         # FIFO pg replacement
@@ -52,12 +53,18 @@ class PhysicalMemory:
             frame_number = self.frame_queue.pop(0)  
             old_page = next(page for page, frame in self.page_to_frame.items() if frame == frame_number)
             del self.page_to_frame[old_page]
+            self.current_pages.remove(old_page)
 
         self.frames[frame_number] = page_data
         self.frame_queue.append(frame_number)
         self.page_to_frame[page_number] = frame_number
+        self.current_pages.add(page_number)
         print(f"Page {page_number} loaded into frame {frame_number}")
         return frame_number
+    
+    def is_page_in_memory(self, page_number):
+        return page_number in self.current_pages
+
     
     def verify_page_loading(self, page_number, frame_number):
         if self.page_to_frame.get(page_number) != frame_number:
@@ -88,24 +95,33 @@ def simulate(addresses_file, num_frames):
                     page_number = (logical_address >> 8) & 0xFF
                     offset = logical_address & 0xFF
 
+                    print(f"log address: {logical_address} (Page: {page_number}, Offset: {offset})")
+
                     frame_number = tlb.lookup(page_number)
-                    if frame_number is not None:
+                    if frame_number is not None and physical_memory.is_page_in_memory(page_number):
+                        print(f"Hit: Page {page_number} is in frame {frame_number}")
                         tlb_hits += 1
                     else:
+                        print(f"Miss: Page {page_number} not found in TLB")
                         frame_number = page_table.lookup(page_number)
-                        if frame_number is None:
+                        if frame_number is None or not physical_memory.is_page_in_memory(page_number):
+                            print(f"Page Fault: Page {page_number} not in memory")
                             page_faults += 1
                             try:
                                 page_data = read_backing_store('BACKING_STORE.bin', page_number)
                                 frame_number = physical_memory.load_page(page_data, page_number)
                                 page_table.update(page_number, frame_number)
+                                print(f"page loaded {page_number} into frame {frame_number}")
                             except FileNotFoundError:
                                 print("BACKING_STORE.bin not found.")
                                 sys.exit(1)
                             except IOError:
                                 print("Error reading from BACKING_STORE.bin.")
                                 sys.exit(1)
+                        else:
+                            print(f"Page {page_number} found in page table (Frame: {frame_number})")
                         tlb.update(page_number, frame_number)
+                        print(f"TLB updated with page {page_number} -> frame {frame_number}")
                         if not physical_memory.verify_page_loading(page_number, frame_number):
                             print(f"Verification failed for page {page_number}")
 
@@ -114,6 +130,7 @@ def simulate(addresses_file, num_frames):
                     byte_value = unsigned_byte if unsigned_byte < 128 else unsigned_byte - 256
 
                     frame_content = physical_memory.frames[frame_number].hex()
+                    print(f"Logical Address: {logical_address}, Byte Value: {byte_value}, Frame: {frame_number}")
 
                     print(f"{logical_address},{byte_value},{frame_number},\n{frame_content}")
                     total_references += 1
