@@ -98,11 +98,17 @@ def simulate(addresses_file, num_frames):
                     print(f"log address: {logical_address} (Page: {page_number}, Offset: {offset})")
 
                     frame_number = tlb.lookup(page_number)
-                    if frame_number is not None and physical_memory.is_page_in_memory(page_number):
-                        print(f"Hit: Page {page_number} is in frame {frame_number}")
-                        tlb_hits += 1
+                    if frame_number is not None:
+                        if physical_memory.is_page_in_memory(page_number):
+                            print(f"Hit: Page {page_number} is in frame {frame_number}")
+                            tlb_hits += 1
+                        else:
+                            print(f"TLB Soft Miss: Page {page_number} is in TLB but not in memory")
+                            frame_number = None  # Treat as a TLB miss
                     else:
                         print(f"Miss: Page {page_number} not found in TLB")
+
+                    if frame_number is None:
                         frame_number = page_table.lookup(page_number)
                         if frame_number is None or not physical_memory.is_page_in_memory(page_number):
                             print(f"Page Fault: Page {page_number} not in memory")
