@@ -43,29 +43,33 @@ class PhysicalMemory:
             self.frames.append(bytearray(FRAME_SIZE))
         self.frame_queue = []
         self.page_to_frame = {}
+        self.frame_to_page = {} 
         self.current_pages = set()
 
     def load_page(self, page_data, page_number):
-        # FIFO pg replacement
+        if len(self.frames) == 0:
+            raise ValueError("No frames available in physical memory.")
+
         if len(self.frame_queue) < len(self.frames):
             frame_number = len(self.frame_queue)
         else:
-            frame_number = self.frame_queue.pop(0)  
-            old_page = next(page for page, frame in self.page_to_frame.items() if frame == frame_number)
-            del self.page_to_frame[old_page]
-            self.current_pages.remove(old_page)
+            frame_number = self.frame_queue.pop(0)
+            old_page = self.frame_to_page.get(frame_number)
+            if old_page is not None:
+                del self.page_to_frame[old_page]
+                self.current_pages.remove(old_page)
 
         self.frames[frame_number] = page_data
         self.frame_queue.append(frame_number)
         self.page_to_frame[page_number] = frame_number
+        self.frame_to_page[frame_number] = page_number  
         self.current_pages.add(page_number)
         print(f"Page {page_number} loaded into frame {frame_number}")
         return frame_number
-    
+
     def is_page_in_memory(self, page_number):
         return page_number in self.current_pages
 
-    
     def verify_page_loading(self, page_number, frame_number):
         if self.page_to_frame.get(page_number) != frame_number:
             print(f"Error: Page {page_number} is not in the expected frame {frame_number}")
@@ -73,10 +77,19 @@ class PhysicalMemory:
         return True
 
 def read_backing_store(filename, page_number):
-    with open(filename, 'rb') as f:
-        f.seek(page_number * PAGE_SIZE)
-        return f.read(PAGE_SIZE)
-
+    try:
+        with open(filename, 'rb') as f:
+            f.seek(page_number * PAGE_SIZE)
+            return f.read(PAGE_SIZE)
+    except FileNotFoundError:
+        print(f"Error: Backing store file '{filename}' not found.")
+        sys.exit(1)
+    except IOError as e:
+        print(f"Error reading from backing store file '{filename}': {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error while reading backing store: {e}")
+        sys.exit(1)
     
 def simulate(addresses_file, num_frames):
     tlb = TLB()
@@ -159,6 +172,7 @@ def simulate(addresses_file, num_frames):
     print(f"TLB Hits = {tlb_hits}")
     print(f"TLB Misses = {tlb_misses}")
     print(f"TLB Hit Rate = {tlb_hits/total_references:.3f}\n")
+
 
 
 if __name__ == "__main__":
