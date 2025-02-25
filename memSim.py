@@ -379,7 +379,7 @@
 import sys
 
 TLB_SIZE = 16
-PAGE_TABLE_SIZE = 256  # Increased to accommodate larger page numbers
+PAGE_TABLE_SIZE = 65536
 PAGE_SIZE = 256
 FRAME_SIZE = 256
 
@@ -432,6 +432,7 @@ class PhysicalMemory:
         self.page_to_frame[page_number] = frame_number
         self.frame_to_page[frame_number] = page_number
         self.current_pages.add(page_number)
+        print(f"Page {page_number} loaded into frame {frame_number}")
         return frame_number
 
     def replace_page(self, new_page):
@@ -534,7 +535,7 @@ def simulate(addresses_file, num_frames, algorithm):
     print(f"Page Fault Rate = {page_faults/total_references:.3f}")
     print(f"TLB Hits = {tlb_hits}")
     print(f"TLB Misses = {tlb_misses}")
-    print(f"TLB Hit Rate = {tlb_hits/total_references:.3f}")
+    print(f"TLB Hit Rate = {tlb_hits/total_references:.3f}\n")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
